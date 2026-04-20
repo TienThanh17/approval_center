@@ -301,7 +301,6 @@ class ApprovalConfig(models.Model):
                 ' string="{label}"/>'
             ).format(va_id=va_id, label=label, inv=invisible_expr, css=css_extra)
 
-        # view_draft_btn    = _view_btn("📋 Draft",     "approval_state != 'draft'")
         view_waiting_btn  = _view_btn("⏳ Waiting",   "approval_state != 'waiting'",   "text-warning")
         view_approved_btn = _view_btn("✅ Approved",  "approval_state != 'approved'",  "text-success")
         view_rejected_btn = _view_btn("❌ Rejected",  "approval_state != 'rejected'",  "text-danger")
@@ -316,7 +315,6 @@ class ApprovalConfig(models.Model):
             "    {submit}\n"
             "    {approve}\n"
             "    {reject}\n"
-            # "    {view_draft}\n"
             "    {view_waiting}\n"
             "    {view_approved}\n"
             "    {view_rejected}\n"
