@@ -230,20 +230,26 @@ class ApprovalConfig(models.Model):
 
     def _ensure_server_action_view_approvals(self):
         self.ensure_one()
-        model_name = self.model_id.model
+        config_id = self.id
         vals = {
             "name": _("AdecSol View Approvals (%s)") % self.name,
             "model_id": self.model_id.id,
             "state": "code",
             "code": (
-                "action = {\n"
-                "    'type': 'ir.actions.act_window',\n"
-                "    'name': 'Approval Requests',\n"
-                "    'res_model': 'approval.request',\n"
-                "    'view_mode': 'list,form',\n"
-                "    'domain': [('model', '=', '%s'), ('res_id', '=', record.id)],\n"
-                "}\n"
-            ) % model_name,
+                "req = env['approval.request'].search(\n"
+                "    [('config_id', '=', %d), ('res_id', '=', record.id)],\n"
+                "    order='id desc', limit=1\n"
+                ")\n"
+                "if req:\n"
+                "    action = {\n"
+                "        'type': 'ir.actions.act_window',\n"
+                "        'name': 'Approval Request',\n"
+                "        'res_model': 'approval.request',\n"
+                "        'view_mode': 'form',\n"
+                "        'res_id': req.id,\n"
+                "        'target': 'current',\n"
+                "    }\n"
+            ) % config_id,
         }
         if self.view_approvals_server_action_id:
             self.view_approvals_server_action_id.write(vals)
@@ -255,7 +261,7 @@ class ApprovalConfig(models.Model):
 
         def _safe_btn(action_id, string, css_class, invisible_expr, groups=None):
             btn = etree.Element("button")
-            btn.set("name", str(int(action_id)))  # int() tránh injection
+            btn.set("name", str(int(action_id)))
             btn.set("type", "action")
             btn.set("string", string)
             btn.set("class", css_class)
@@ -277,7 +283,6 @@ class ApprovalConfig(models.Model):
             "approval_state != 'waiting' or not approval_is_approver",
             groups=STATIC_APPROVAL_GROUP_XMLID,
         )
-        # FIX [Missing]: Nút Reject
         reject_btn = _safe_btn(
             reject_action.id,
             _("Reject"),
@@ -286,30 +291,21 @@ class ApprovalConfig(models.Model):
             groups=STATIC_APPROVAL_GROUP_XMLID,
         )
 
-        va_id = int(view_approvals_action.id)  # safe — no string injection
+        va_id = int(view_approvals_action.id)
 
-        def _stat_btn(invisible_expr, css_class, icon, label):
+        def _view_btn(label, invisible_expr, css_extra=""):
             return (
-                "<button name=\"%(va_id)d\" type=\"action\""
-                " class=\"oe_stat_button %(css)s\""
-                " icon=\"%(icon)s\""
-                " invisible=\"%(inv)s\">"
-                "<div class=\"o_stat_info\">"
-                "<span class=\"o_stat_text\">%(label)s</span>"
-                "</div>"
-                "</button>"
-            ) % {
-                "va_id": va_id,
-                "css": css_class,
-                "icon": icon,
-                "inv": invisible_expr,
-                "label": label,
-            }
+                '<button name="{va_id}" type="action"'
+                ' class="btn-light border ms-2 {css}"'
+                ' invisible="{inv}"'
+                ' string="{label}"/>'
+            ).format(va_id=va_id, label=label, inv=invisible_expr, css=css_extra)
 
-        draft_btn   = _stat_btn("approval_state != 'draft'",     "text-secondary border border-secondary", "fa-hourglass-o",  "Draft")
-        waiting_btn = _stat_btn("approval_state != 'waiting'",   "text-warning border border-warning",     "fa-clock-o",      "Waiting Approval")
-        approved_btn= _stat_btn("approval_state != 'approved'",  "text-success border border-success",     "fa-check-circle", "Approved")
-        rejected_btn= _stat_btn("approval_state != 'rejected'",  "text-danger border border-danger",       "fa-times-circle", "Rejected")
+        # view_draft_btn    = _view_btn("📋 Draft",     "approval_state != 'draft'")
+        view_waiting_btn  = _view_btn("⏳ Waiting",   "approval_state != 'waiting'",   "text-warning")
+        view_approved_btn = _view_btn("✅ Approved",  "approval_state != 'approved'",  "text-success")
+        view_rejected_btn = _view_btn("❌ Rejected",  "approval_state != 'rejected'",  "text-danger")
+        view_cancel_btn   = _view_btn("🚫 Cancelled", "approval_state != 'cancelled'", "text-secondary")
 
         arch_db = (
             "<data>\n"
@@ -320,20 +316,22 @@ class ApprovalConfig(models.Model):
             "    {submit}\n"
             "    {approve}\n"
             "    {reject}\n"
-            "  </xpath>\n"
-            "  <xpath expr=\"//form/sheet\" position=\"before\">\n"
-            "    <div name=\"button_box\" class=\"oe_button_box\">\n"
-            "      {draft}{waiting}{approved}{rejected}\n"
-            "    </div>\n"
+            # "    {view_draft}\n"
+            "    {view_waiting}\n"
+            "    {view_approved}\n"
+            "    {view_rejected}\n"
+            "    {view_cancel}\n"
             "  </xpath>\n"
             "</data>"
         ).format(
             submit=submit_btn, approve=approve_btn, reject=reject_btn,
-            draft=draft_btn, waiting=waiting_btn,
-            approved=approved_btn, rejected=rejected_btn,
+            # view_draft=view_draft_btn,
+            view_waiting=view_waiting_btn,
+            view_approved=view_approved_btn,
+            view_rejected=view_rejected_btn,
+            view_cancel=view_cancel_btn,
         )
 
-        # FIX [Technical]: dùng model_id.model (đã validate) thay vì string format tự do
         view_name = "approval_center.inject.%s.%d" % (self.model_id.model, self.id)
         vals = {
             "name": view_name,
