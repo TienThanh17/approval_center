@@ -71,6 +71,9 @@ class ApprovalConfig(models.Model):
     inherit_view_id = fields.Many2one(
         "ir.ui.view", readonly=True, ondelete="set null", string="Injected Inherited View"
     )
+    view_approvals_server_action_id = fields.Many2one(
+        "ir.actions.server", readonly=True, ondelete="set null", string="View Approvals Server Action"
+    )
 
     # FIX [Technical]: Bỏ unique constraint theo model_id — quá restrictive.
     # Thay bằng unique theo (model_id, name) để hỗ trợ nhiều config trên cùng model.
@@ -113,6 +116,7 @@ class ApprovalConfig(models.Model):
             self.mapped("submit_server_action_id")
             | self.mapped("approve_server_action_id")
             | self.mapped("reject_server_action_id")
+            | self.mapped("view_approvals_server_action_id")
         )
         views = self.mapped("inherit_view_id")
         if actions:
@@ -154,13 +158,17 @@ class ApprovalConfig(models.Model):
         submit_action = sudo_cfg._ensure_server_action_submit()
         approve_action = sudo_cfg._ensure_server_action_approve()
         reject_action = sudo_cfg._ensure_server_action_reject()
-        inherit_view = sudo_cfg._ensure_inherited_view(submit_action, approve_action, reject_action)
+        view_approvals_action = sudo_cfg._ensure_server_action_view_approvals()
+        inherit_view = sudo_cfg._ensure_inherited_view(
+            submit_action, approve_action, reject_action, view_approvals_action
+        )
 
         sudo_cfg.write(
             {
                 "submit_server_action_id": submit_action.id,
                 "approve_server_action_id": approve_action.id,
                 "reject_server_action_id": reject_action.id,
+                "view_approvals_server_action_id": view_approvals_action.id,
                 "inherit_view_id": inherit_view.id,
             }
         )
@@ -220,7 +228,29 @@ class ApprovalConfig(models.Model):
             return self.reject_server_action_id
         return self.env["ir.actions.server"].create(vals)
 
-    def _ensure_inherited_view(self, submit_action, approve_action, reject_action):
+    def _ensure_server_action_view_approvals(self):
+        self.ensure_one()
+        model_name = self.model_id.model
+        vals = {
+            "name": _("AdecSol View Approvals (%s)") % self.name,
+            "model_id": self.model_id.id,
+            "state": "code",
+            "code": (
+                "action = {\n"
+                "    'type': 'ir.actions.act_window',\n"
+                "    'name': 'Approval Requests',\n"
+                "    'res_model': 'approval.request',\n"
+                "    'view_mode': 'list,form',\n"
+                "    'domain': [('model', '=', '%s'), ('res_id', '=', record.id)],\n"
+                "}\n"
+            ) % model_name,
+        }
+        if self.view_approvals_server_action_id:
+            self.view_approvals_server_action_id.write(vals)
+            return self.view_approvals_server_action_id
+        return self.env["ir.actions.server"].create(vals)
+
+    def _ensure_inherited_view(self, submit_action, approve_action, reject_action, view_approvals_action):
         self.ensure_one()
 
         def _safe_btn(action_id, string, css_class, invisible_expr, groups=None):
@@ -256,6 +286,31 @@ class ApprovalConfig(models.Model):
             groups=STATIC_APPROVAL_GROUP_XMLID,
         )
 
+        va_id = int(view_approvals_action.id)  # safe — no string injection
+
+        def _stat_btn(invisible_expr, css_class, icon, label):
+            return (
+                "<button name=\"%(va_id)d\" type=\"action\""
+                " class=\"oe_stat_button %(css)s\""
+                " icon=\"%(icon)s\""
+                " invisible=\"%(inv)s\">"
+                "<div class=\"o_stat_info\">"
+                "<span class=\"o_stat_text\">%(label)s</span>"
+                "</div>"
+                "</button>"
+            ) % {
+                "va_id": va_id,
+                "css": css_class,
+                "icon": icon,
+                "inv": invisible_expr,
+                "label": label,
+            }
+
+        draft_btn   = _stat_btn("approval_state != 'draft'",     "text-secondary border border-secondary", "fa-hourglass-o",  "Draft")
+        waiting_btn = _stat_btn("approval_state != 'waiting'",   "text-warning border border-warning",     "fa-clock-o",      "Waiting Approval")
+        approved_btn= _stat_btn("approval_state != 'approved'",  "text-success border border-success",     "fa-check-circle", "Approved")
+        rejected_btn= _stat_btn("approval_state != 'rejected'",  "text-danger border border-danger",       "fa-times-circle", "Rejected")
+
         arch_db = (
             "<data>\n"
             "  <xpath expr=\"//form/header\" position=\"inside\">\n"
@@ -266,8 +321,17 @@ class ApprovalConfig(models.Model):
             "    {approve}\n"
             "    {reject}\n"
             "  </xpath>\n"
+            "  <xpath expr=\"//form/sheet\" position=\"before\">\n"
+            "    <div name=\"button_box\" class=\"oe_button_box\">\n"
+            "      {draft}{waiting}{approved}{rejected}\n"
+            "    </div>\n"
+            "  </xpath>\n"
             "</data>"
-        ).format(submit=submit_btn, approve=approve_btn, reject=reject_btn)
+        ).format(
+            submit=submit_btn, approve=approve_btn, reject=reject_btn,
+            draft=draft_btn, waiting=waiting_btn,
+            approved=approved_btn, rejected=rejected_btn,
+        )
 
         # FIX [Technical]: dùng model_id.model (đã validate) thay vì string format tự do
         view_name = "approval_center.inject.%s.%d" % (self.model_id.model, self.id)
