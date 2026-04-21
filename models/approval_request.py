@@ -154,12 +154,61 @@ class ApprovalRequest(models.Model):
         for req in self:
             if req.state not in ("draft", "waiting"):
                 raise UserError(_("Only draft or waiting requests can be cancelled."))
+            if self.env.user not in req.approver_ids:
+                raise UserError(_("Only approvers can cancel this request."))
             if req.state == "waiting":
                 # Xóa activity đang mở nếu có
                 req.activity_ids.unlink()
             req.write({"state": "cancelled"})
             req.message_post(
                 body=_("Approval request cancelled by %s.") % self.env.user.name
+            )
+        return True
+
+    def action_approve_request(self):
+        self.ensure_one()
+        if self.env.user not in self.approver_ids:
+            raise UserError(_("You are not an approver for this request."))
+        self._do_approve(self.env.user)
+        return True
+
+    def action_reject_request(self):
+        self.ensure_one()
+        if self.env.user not in self.approver_ids:
+            raise UserError(_("You are not an approver for this request."))
+        self._do_reject(self.env.user)
+        return True
+
+    def action_withdraw(self):
+        for req in self:
+            if req.state not in ("approved", "rejected"):
+                raise UserError(_("Only approved or rejected requests can be withdrawn."))
+            if self.env.user not in req.approver_ids:
+                raise UserError(_("Only approvers can withdraw this request."))
+            
+            req.write({
+                "state": "waiting",
+                "approved_by_ids": [(5, 0, 0)],
+                "rejected_by_id": False,
+                "approval_date": False,
+            })
+            
+            req._notify_approvers()
+            req.message_post(
+                body=_("Approval request withdrawn by %s and reverted to waiting.") % self.env.user.name
+            )
+        return True
+
+    def action_back_to_draft(self):
+        for req in self:
+            if req.state != "cancelled":
+                raise UserError(_("Only cancelled requests can be reverted to draft."))
+            if self.env.user != req.requester_id and self.env.user not in req.approver_ids:
+                raise UserError(_("Only the requester or an approver can revert this request to draft."))
+            
+            req.write({"state": "draft"})
+            req.message_post(
+                body=_("Approval request reverted to draft by %s.") % self.env.user.name
             )
         return True
 

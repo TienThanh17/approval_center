@@ -18,17 +18,14 @@
     </record>
 
     <!--
-        FIX [Technical]: Phân quyền rõ ràng hơn cho approval.request:
-        - User thường: đọc tất cả + tạo mới (để submit) + sửa request của chính mình
-        - Approver: đọc + sửa request mà mình là approver
-        - Approver: unlink request của mình hoặc đã cancelled
+        User thường: chỉ thấy request do mình tạo.
+        Approver cũng thuộc group này nên domain phải OR thêm approver_ids
+        để khi Odoo AND 2 group, approver vẫn thấy đủ request của mình.
     -->
-
-    <!-- User: đọc tất cả request (để xem trạng thái record mình submit) -->
-    <record id="rule_approval_request_read_all" model="ir.rule">
-        <field name="name">Approval Request: read all</field>
+    <record id="rule_approval_request_read_user" model="ir.rule">
+        <field name="name">Approval Request: user read own or assigned</field>
         <field name="model_id" ref="model_approval_request"/>
-        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="domain_force">['|', ('requester_id', '=', user.id), ('approver_ids', 'in', [user.id])]</field>
         <field name="perm_read" eval="True"/>
         <field name="perm_write" eval="False"/>
         <field name="perm_create" eval="True"/>
@@ -48,7 +45,7 @@
         <field name="groups" eval="[(4, ref('approval_center.group_approval_user'))]"/>
     </record>
 
-    <!-- Approver: đọc + sửa request mà mình là approver -->
+    <!-- Approver: đọc + sửa + unlink request mà mình là approver -->
     <record id="rule_approval_request_write_approver" model="ir.rule">
         <field name="name">Approval Request: approver can write</field>
         <field name="model_id" ref="model_approval_request"/>

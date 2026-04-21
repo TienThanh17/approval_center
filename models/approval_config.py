@@ -304,7 +304,7 @@ class ApprovalConfig(models.Model):
         view_waiting_btn  = _view_btn("⏳ Waiting",   "approval_state != 'waiting'",   "text-warning")
         view_approved_btn = _view_btn("✅ Approved",  "approval_state != 'approved'",  "text-success")
         view_rejected_btn = _view_btn("❌ Rejected",  "approval_state != 'rejected'",  "text-danger")
-        view_cancel_btn   = _view_btn("🚫 Cancelled", "approval_state != 'cancelled'", "text-secondary")
+        view_cancel_btn   = _view_btn("🚫 Cancelled", "approval_state != 'cancelled'", "text-danger")
 
         arch_db = (
             "<data>\n"
@@ -323,7 +323,6 @@ class ApprovalConfig(models.Model):
             "</data>"
         ).format(
             submit=submit_btn, approve=approve_btn, reject=reject_btn,
-            # view_draft=view_draft_btn,
             view_waiting=view_waiting_btn,
             view_approved=view_approved_btn,
             view_rejected=view_rejected_btn,
@@ -370,10 +369,20 @@ class ApprovalConfig(models.Model):
         if self.env.cr.fetchone():
             raise UserError(_("A pending approval request already exists for this record."))
 
-        request = ApprovalRequest.with_context(
-            mail_auto_subscribe_no_notify=True,
-            mail_create_nosubscribe=True,
-        ).create({
+        # request = ApprovalRequest.with_context(
+        #     mail_auto_subscribe_no_notify=True,
+        #     mail_create_nosubscribe=True,
+        # ).create({
+        #     "model": record._name,
+        #     "res_id": record.id,
+        #     "requester_id": self.env.user.id,
+        #     "approver_ids": [(6, 0, self.approver_ids.ids)],
+        #     "config_id": self.id,
+        #     "state": "waiting",
+        #     "require_all_approvers": self.require_all_approvers,
+        # })
+
+        request = ApprovalRequest.create({
             "model": record._name,
             "res_id": record.id,
             "requester_id": self.env.user.id,

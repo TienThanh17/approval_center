@@ -33,11 +33,40 @@
         <field name="arch" type="xml">
             <form string="Approval Request">
                 <header>
+                    <!-- Approve: approver thấy khi state waiting -->
+                    <button name="action_approve_request" type="object" string="Approve"
+                            class="btn-success"
+                            invisible="state != 'waiting'"
+                            groups="approval_center.group_approval_approver"
+                            confirm="Are you sure you want to approve this request?"/>
+
+                    <!-- Reject: approver thấy khi state waiting -->
+                    <button name="action_reject_request" type="object" string="Reject"
+                            class="btn-danger"
+                            invisible="state != 'waiting'"
+                            groups="approval_center.group_approval_approver"
+                            confirm="Are you sure you want to reject this request?"/>
+
                     <!-- FIX [Missing]: Nút Cancel -->
-                    <button name="action_cancel" type="object" string="Cancel Request"
+                    <button name="action_cancel" type="object" string="Cancel"
                             class="btn-secondary"
                             invisible="state not in ('draft', 'waiting')"
                             confirm="Are you sure you want to cancel this approval request?"/>
+                    
+                    <!-- Withdraw: approver thấy khi state approved hoặc rejected -->
+                    <button name="action_withdraw" type="object" string="Withdraw"
+                            class="btn-warning"
+                            invisible="state not in ('approved', 'rejected')"
+                            groups="approval_center.group_approval_approver"
+                            confirm="This will revert the request back to Waiting. Continue?"/>
+
+                    <!-- Back to Draft: requester thấy khi state cancelled -->
+                    <button name="action_back_to_draft" type="object" string="Back to Draft"
+                            class="btn-secondary"
+                            invisible="state != 'cancelled'"
+                            groups="approval_center.group_approval_approver"
+                            confirm="Are you sure you want to revert this request to Draft?"/>
+
                     <field name="state" widget="statusbar"
                         statusbar_visible="draft,waiting,approved,rejected" />
                 </header>
@@ -162,6 +191,7 @@
         <field name="view_mode">list,kanban,form</field>
         <field name="search_view_id" ref="view_approval_request_search"/>
         <!-- Default: hiện các request liên quan đến user hiện tại -->
+        <field name="domain">[('approver_ids', 'in', [uid])]</field>
         <field name="context">{'search_default_my_to_approve': 1}</field>
     </record>
 

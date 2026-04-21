@@ -9,7 +9,7 @@
               parent="approval_menu_root"
               action="approval_center.approval_request_action"
               sequence="10"
-              groups="approval_center.group_approval_user"/>
+              groups="approval_center.group_approval_approver"/>
 
     <!-- FIX [UX]: "My Requests" — request do user tạo -->
     <menuitem id="approval_request_my_menu"

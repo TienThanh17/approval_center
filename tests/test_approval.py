@@ -308,6 +308,61 @@ class TestApprovalApproveReject(TransactionCase):
         with self.assertRaises(UserError):
             req.action_cancel()
 
+    def test_withdraw_from_approved(self):
+        """Approve xong -> approver withdraw -> state == 'waiting', cleared approved_by_ids."""
+        _, req = self._make_waiting_request()
+        req._do_approve(self.approver1)
+        req.with_user(self.approver1).action_withdraw()
+        self.assertEqual(req.state, "waiting")
+        self.assertFalse(req.approved_by_ids)
+        self.assertFalse(req.approval_date)
+
+    def test_withdraw_from_rejected(self):
+        """Reject xong -> approver withdraw -> state == 'waiting', cleared rejected_by_id."""
+        _, req = self._make_waiting_request()
+        req._do_reject(self.approver1)
+        req.with_user(self.approver1).action_withdraw()
+        self.assertEqual(req.state, "waiting")
+        self.assertFalse(req.rejected_by_id)
+
+    def test_withdraw_outsider_blocked(self):
+        """User khong phai approver withdraw -> UserError."""
+        _, req = self._make_waiting_request()
+        req._do_approve(self.approver1)
+        with self.assertRaises(UserError):
+            req.with_user(self.outsider).action_withdraw()
+
+    def test_withdraw_wrong_state_blocked(self):
+        """Withdraw khi state waiting -> UserError."""
+        _, req = self._make_waiting_request()
+        with self.assertRaises(UserError):
+            req.with_user(self.approver1).action_withdraw()
+
+    def test_back_to_draft_from_cancelled(self):
+        """Cancel xong -> requester back to draft -> state == 'draft'."""
+        _, req = self._make_waiting_request()
+        req.with_user(self.outsider).action_cancel()
+        req.with_user(self.outsider).action_back_to_draft()
+        self.assertEqual(req.state, "draft")
+
+    def test_back_to_draft_outsider_blocked(self):
+        """User khong phai requester hay approver -> UserError."""
+        _, req = self._make_waiting_request()
+        req.with_user(self.outsider).action_cancel()
+        outsider2 = self.env["res.users"].create({
+            "name": "Outsider 2",
+            "login": "outsider2@test.com",
+            "groups_id": [(4, self.env.ref("approval_center.group_approval_user").id)],
+        })
+        with self.assertRaises(UserError):
+            req.with_user(outsider2).action_back_to_draft()
+
+    def test_back_to_draft_wrong_state_blocked(self):
+        """Back to draft khi waiting -> UserError."""
+        _, req = self._make_waiting_request()
+        with self.assertRaises(UserError):
+            req.with_user(self.outsider).action_back_to_draft()
+
 
 @tagged("post_install", "-at_install")
 class TestBaseInheritCompute(TransactionCase):
@@ -381,3 +436,99 @@ class TestBaseInheritCompute(TransactionCase):
         partner = self.env["res.partner"].create({"name": "Is Approver Partner"})
         partner_as_approver = partner.with_user(self.approver)
         self.assertTrue(partner_as_approver.approval_is_approver)
+
+
+@tagged("post_install", "-at_install")
+class TestApprovalRequestDirectActions(TransactionCase):
+    """Tests for direct Approve/Reject actions on approval.request."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.approver1 = cls.env["res.users"].create({
+            "name": "Direct Approver 1",
+            "login": "direct1@test.com",
+            "groups_id": [(4, cls.env.ref("approval_center.group_approval_approver").id)],
+        })
+        cls.approver2 = cls.env["res.users"].create({
+            "name": "Direct Approver 2",
+            "login": "direct2@test.com",
+            "groups_id": [(4, cls.env.ref("approval_center.group_approval_approver").id)],
+        })
+        cls.outsider = cls.env["res.users"].create({
+            "name": "Direct Outsider",
+            "login": "direct_out@test.com",
+            "groups_id": [(4, cls.env.ref("approval_center.group_approval_user").id)],
+        })
+        cls.partner_model = cls.env["ir.model"].search([("model", "=", "res.partner")], limit=1)
+        cls.partner_form_view = cls.env["ir.ui.view"].search([
+            ("model", "=", "res.partner"),
+            ("type", "=", "form"),
+            ("inherit_id", "=", False),
+        ], limit=1)
+
+    def _make_waiting_request(self, require_all=False):
+        cfg = self.env["approval.config"].create({
+            "name": "Direct Config %s" % require_all,
+            "model_id": self.partner_model.id,
+            "view_id": self.partner_form_view.id,
+            "approver_ids": [(6, 0, [self.approver1.id, self.approver2.id])],
+            "require_all_approvers": require_all,
+        })
+        cfg.action_confirm()
+        partner = self.env["res.partner"].create({"name": "Direct Partner %s" % require_all})
+        req = self.env["approval.request"].create({
+            "model": "res.partner",
+            "res_id": partner.id,
+            "requester_id": self.outsider.id,
+            "approver_ids": [(6, 0, [self.approver1.id, self.approver2.id])],
+            "config_id": cfg.id,
+            "state": "waiting",
+            "require_all_approvers": require_all,
+        })
+        return cfg, req
+
+    def test_approve_request_direct(self):
+        _, req = self._make_waiting_request(require_all=False)
+        req.with_user(self.approver1).action_approve_request()
+        self.assertEqual(req.state, "approved")
+        self.assertIn(self.approver1, req.approved_by_ids)
+
+    def test_reject_request_direct(self):
+        _, req = self._make_waiting_request(require_all=False)
+        req.with_user(self.approver1).action_reject_request()
+        self.assertEqual(req.state, "rejected")
+        self.assertEqual(req.rejected_by_id, self.approver1)
+
+    def test_approve_require_all_partial(self):
+        _, req = self._make_waiting_request(require_all=True)
+        req.with_user(self.approver1).action_approve_request()
+        self.assertEqual(req.state, "waiting")
+
+    def test_approve_require_all_full(self):
+        _, req = self._make_waiting_request(require_all=True)
+        req.with_user(self.approver1).action_approve_request()
+        req.with_user(self.approver2).action_approve_request()
+        self.assertEqual(req.state, "approved")
+
+    def test_approve_outsider_blocked(self):
+        _, req = self._make_waiting_request()
+        with self.assertRaises(UserError):
+            req.with_user(self.outsider).action_approve_request()
+
+    def test_reject_outsider_blocked(self):
+        _, req = self._make_waiting_request()
+        with self.assertRaises(UserError):
+            req.with_user(self.outsider).action_reject_request()
+
+    def test_approve_duplicate_blocked(self):
+        _, req = self._make_waiting_request(require_all=True)
+        req.with_user(self.approver1).action_approve_request()
+        with self.assertRaises(UserError):
+            req.with_user(self.approver1).action_approve_request()
+
+    def test_approve_wrong_state_blocked(self):
+        _, req = self._make_waiting_request(require_all=False)
+        req.with_user(self.approver1).action_approve_request()
+        with self.assertRaises(UserError):
+            req.with_user(self.approver2).action_approve_request()
