@@ -118,31 +118,37 @@
         <field name="name">approval.request.kanban</field>
         <field name="model">approval.request</field>
         <field name="arch" type="xml">
-            <kanban default_group_by="state" class="o_kanban_small_column">
+            <kanban class="o_kanban_small_column" default_group_by="state" default_order="create_date desc" 
+                    group_create="false" group_edit="false" group_delete="false" 
+                    records_draggable="false" quick_create="false">
                 <field name="name"/>
                 <field name="res_name"/>
                 <field name="requester_id"/>
                 <field name="approver_ids"/>
                 <field name="state"/>
                 <field name="deadline"/>
-                <templates>
+                 <templates>
                     <t t-name="card">
-                        <div class="oe_kanban_global_click">
-                            <div class="fw-bold">
-                                <field name="name"/>
-                            </div>
-                            <div class="text-muted o_text_overflow">
-                                <field name="res_name"/>
-                            </div>
-                            <div class="mt-2 d-flex align-items-center justify-content-between">
-                                <field name="requester_id" widget="many2one_avatar_user"/>
-                                <field name="deadline" widget="date"
-                                       invisible="not deadline"/>
-                            </div>
-                            <div class="mt-1">
-                                <field name="approver_ids" widget="many2many_avatar_user"/>
-                            </div>
+                        <div class="ribbon ribbon-top-right" invisible="state not in ['waiting', 'approved', 'rejected', 'cancelled']">
+                            <field name="state" t-if="record.state.raw_value == 'waiting'" class="text-bg-info"/>
+                            <field name="state" t-if="record.state.raw_value == 'approved'" class="text-bg-success"/>
+                            <field name="state" t-if="record.state.raw_value == 'rejected'" class="text-bg-danger"/>
+                            <field name="state" t-if="record.state.raw_value == 'cancelled'" class="text-bg-warning"/>
                         </div>
+                        <field name="name" class="fw-bolder fs-5"/>
+                        <field name="res_name" class="text-muted"/>
+                        
+                        <div class="mt-2 d-flex align-items-center">
+                            <strong class="me-2 text-muted">Requester: </strong>
+                            <field name="requester_id" widget="many2one_avatar_user"/>
+                        </div>
+                        
+                        <footer class="pt-2">
+                            <div class="d-flex align-items-center w-100">
+                                <strong class="me-2 text-muted">Approvers: </strong>
+                                <field name="approver_ids" widget="many2many_avatar_user" readonly="1"/>
+                            </div>
+                        </footer>
                     </t>
                 </templates>
             </kanban>
@@ -199,7 +205,7 @@
     <record id="approval_request_my_action" model="ir.actions.act_window">
         <field name="name">My Approval Requests</field>
         <field name="res_model">approval.request</field>
-        <field name="view_mode">list,kanban,form</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="search_view_id" ref="view_approval_request_search"/>
         <field name="domain">[('requester_id', '=', uid)]</field>
         <field name="context">{'search_default_submitted_by_me': 1}</field>

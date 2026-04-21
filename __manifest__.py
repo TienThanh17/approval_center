@@ -11,8 +11,8 @@
     ],
     "data": [
         # ============================== SECURITY =============================
-        "security/approval_security.xml",
         "security/ir.model.access.csv",
+        "security/approval_security.xml",
 
         # ============================== VIEWS ================================
         "views/approval_config_views.xml",

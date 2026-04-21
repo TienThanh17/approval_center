@@ -274,7 +274,7 @@ class ApprovalConfig(models.Model):
             submit_action.id,
             _("Submit for Approval"),
             "btn-primary",
-            "approval_state != 'draft' or approval_is_approver",
+            "approval_state != 'draft'",
         )
         approve_btn = _safe_btn(
             approve_action.id,

@@ -68,12 +68,13 @@ class ApprovalRequest(models.Model):
             ("waiting", "Waiting"),
             ("approved", "Approved"),
             ("rejected", "Rejected"),
-            ("cancelled", "Cancelled"),  # FIX [Missing]: trạng thái Cancel
+            ("cancelled", "Cancelled"),
         ],
         default="draft",
         required=True,
         index=True,
         tracking=True,
+        group_expand="_read_group_states",
     )
 
     # FIX [Missing]: deadline field
@@ -88,6 +89,10 @@ class ApprovalRequest(models.Model):
         string="Approved/Rejected On",
         readonly=True,
     )
+
+    @api.model
+    def _read_group_states(self, stages, domain):
+        return ["draft", "waiting", "approved", "rejected", "cancelled"]
 
     # -------------------------------------------------------------------------
     # Compute
