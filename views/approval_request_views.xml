@@ -5,7 +5,7 @@
         <field name="name">approval.request.list</field>
         <field name="model">approval.request</field>
         <field name="arch" type="xml">
-            <list string="Approval Requests" decoration-success="state == 'approved'"
+            <list string="Approval Requests" create="false" decoration-success="state == 'approved'"
                   decoration-warning="state == 'waiting'"
                   decoration-danger="state in ('cancelled', 'rejected')"
                   decoration-muted="state == 'draft'">
@@ -16,7 +16,7 @@
                 <field name="requester_id" />
                 <field name="approver_ids" widget="many2many_tags" />
                 <field name="approved_by_ids" widget="many2many_tags" optional="show"/>
-                <field name="deadline" optional="show"/>
+                <!-- <field name="deadline" optional="show"/> -->
                 <field name="approval_date" optional="hide"/>
                 <field name="state" decoration-success="state == 'approved'"
                     decoration-warning="state == 'waiting'"
@@ -54,11 +54,11 @@
                             confirm="Are you sure you want to cancel this approval request?"/>
                     
                     <!-- Withdraw: approver thấy khi state approved hoặc rejected -->
-                    <button name="action_withdraw" type="object" string="Withdraw"
+                    <!-- <button name="action_withdraw" type="object" string="Withdraw"
                             class="btn-warning"
                             invisible="state not in ('approved', 'rejected')"
                             groups="approval_center.group_approval_approver"
-                            confirm="This will revert the request back to Waiting. Continue?"/>
+                            confirm="This will revert the request back to Waiting. Continue?"/> -->
 
                     <!-- Back to Draft: requester thấy khi state cancelled -->
                     <button name="action_back_to_draft" type="object" string="Back to Draft"
@@ -68,7 +68,7 @@
                             confirm="Are you sure you want to revert this request to Draft?"/>
 
                     <field name="state" widget="statusbar"
-                        statusbar_visible="draft,waiting,approved,rejected" />
+                        statusbar_visible="draft,waiting,approved" />
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
@@ -103,7 +103,7 @@
                         </group>
                     </group>
                     <group string="Timing">
-                        <field name="deadline"/>
+                        <!-- <field name="deadline"/> -->
                         <field name="approval_date" readonly="1" invisible="not approval_date"/>
                         <field name="require_all_approvers" readonly="1"/>
                     </group>
@@ -118,37 +118,48 @@
         <field name="name">approval.request.kanban</field>
         <field name="model">approval.request</field>
         <field name="arch" type="xml">
-            <kanban class="o_kanban_small_column" default_group_by="state" default_order="create_date desc" 
-                    group_create="false" group_edit="false" group_delete="false" 
-                    records_draggable="false" quick_create="false">
+            <kanban class="o_kanban_small_column" default_group_by="state" default_order="create_date desc"
+                    group_create="false" group_edit="false" group_delete="false"
+                    records_draggable="false" quick_create="false" create="false">
                 <field name="name"/>
                 <field name="res_name"/>
                 <field name="requester_id"/>
                 <field name="approver_ids"/>
                 <field name="state"/>
-                <field name="deadline"/>
+                <!-- <field name="deadline"/> -->
                  <templates>
-                    <t t-name="card">
-                        <div class="ribbon ribbon-top-right" invisible="state not in ['waiting', 'approved', 'rejected', 'cancelled']">
-                            <field name="state" t-if="record.state.raw_value == 'waiting'" class="text-bg-info"/>
-                            <field name="state" t-if="record.state.raw_value == 'approved'" class="text-bg-success"/>
-                            <field name="state" t-if="record.state.raw_value == 'rejected'" class="text-bg-danger"/>
-                            <field name="state" t-if="record.state.raw_value == 'cancelled'" class="text-bg-warning"/>
-                        </div>
-                        <field name="name" class="fw-bolder fs-5"/>
-                        <field name="res_name" class="text-muted"/>
-                        
-                        <div class="mt-2 d-flex align-items-center">
-                            <strong class="me-2 text-muted">Requester: </strong>
-                            <field name="requester_id" widget="many2one_avatar_user"/>
-                        </div>
-                        
-                        <footer class="pt-2">
-                            <div class="d-flex align-items-center w-100">
-                                <strong class="me-2 text-muted">Approvers: </strong>
-                                <field name="approver_ids" widget="many2many_avatar_user" readonly="1"/>
+                    <t t-name="kanban-box">
+                        <div t-attf-class="oe_kanban_global_click">
+                            <div class="ribbon ribbon-top-right" invisible="state not in ['waiting', 'approved', 'rejected', 'cancelled']">
+                                <field name="state" t-if="record.state.raw_value == 'waiting'" class="text-bg-info"/>
+                                <field name="state" t-if="record.state.raw_value == 'approved'" class="text-bg-success"/>
+                                <field name="state" t-if="record.state.raw_value == 'rejected'" class="text-bg-danger"/>
+                                <field name="state" t-if="record.state.raw_value == 'cancelled'" class="text-bg-warning"/>
                             </div>
-                        </footer>
+
+                            <div class="o_kanban_record_top">
+                                <div class="o_kanban_record_headings">
+                                    <strong class="o_kanban_record_title fs-5">
+                                        <field name="name"/>
+                                    </strong>
+                                    <div class="text-muted">
+                                        <field name="res_name"/>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-2 d-flex align-items-center">
+                                <strong class="me-2 text-muted">Requester: </strong>
+                                <field name="requester_id" widget="many2one_avatar_user"/>
+                            </div>
+
+                            <footer class="pt-2">
+                                <div class="d-flex align-items-center w-100">
+                                    <strong class="me-2 text-muted">Approvers: </strong>
+                                    <field name="approver_ids" widget="many2many_avatar_user" readonly="1"/>
+                                </div>
+                            </footer>
+                        </div>
                     </t>
                 </templates>
             </kanban>
@@ -178,8 +189,8 @@
                         domain="[('state', '=', 'approved')]"/>
                 <filter name="state_rejected" string="Rejected"
                         domain="[('state', '=', 'rejected')]"/>
-                <filter name="overdue" string="Overdue"
-                        domain="[('deadline', '&lt;', context_today().strftime('%Y-%m-%d')), ('state', '=', 'waiting')]"/>
+                <!-- <filter name="overdue" string="Overdue"
+                        domain="[('deadline', '&lt;', context_today().strftime('%Y-%m-%d')), ('state', '=', 'waiting')]"/> -->
                 <separator/>
                 <group expand="0" string="Group By">
                     <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
