@@ -1,8 +1,9 @@
 {
     "name": "ADEC SOL Approval Center",
-    "summary": "Generic, reusable approval workflow applicable to any model",
+    "summary": "Quy trình phê duyệt chung, có thể tái sử dụng, áp dụng cho mọi mô hình.",
     "version": "18.0.2.0.0",
     "category": "Tools",
+    'images': ['static/description/icon.png'],
     "license": "LGPL-3",
     "author": "ADEC SOL",
     "depends": [
@@ -11,8 +12,8 @@
     ],
     "data": [
         # ============================== SECURITY =============================
-        "security/ir.model.access.csv",
         "security/approval_security.xml",
+        "security/ir.model.access.csv",
 
         # ============================== VIEWS ================================
         "views/approval_config_views.xml",
